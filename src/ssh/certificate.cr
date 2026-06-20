@@ -35,12 +35,15 @@ module SSH
       principals : Array(String),
       ttl_seconds : Int64,
     ) : String
+      raise ArgumentError.new("principals must not be empty — an empty list produces a wildcard certificate valid for any user") if principals.empty?
+      raise ArgumentError.new("ttl_seconds must be positive") unless ttl_seconds > 0
+
       ca = PrivateKey.parse(ca_pem)
       user_pub = PublicKey.parse_ed25519(user_public_key_line)
 
       now = Time.utc.to_unix.to_u64
       valid_after  = now
-      valid_before = (now + ttl_seconds.to_u64)
+      valid_before = now + ttl_seconds.to_u64
 
       # The body is everything up to (but not including) the signature field.
       # We build it first, sign it, then append the signature.

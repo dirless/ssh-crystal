@@ -34,16 +34,28 @@ describe SSH::PrivateKey do
   end
 
   describe ".parse" do
-    it "raises on an encrypted private key" do
-      # Minimal fake PEM with ciphername != "none" — parse will fail at that check.
-      # We just verify the error message is actionable.
+    it "raises on an encrypted private key (ciphername check)" do
       expect_raises(Exception, /encrypted/) do
-        # Build a minimal blob with ciphername = "aes256-ctr"
         outer = IO::Memory.new
         outer.print("openssh-key-v1\0")
         SSH::Wire.write_string(outer, "aes256-ctr")  # ciphername
         SSH::Wire.write_string(outer, "bcrypt")       # kdfname
         SSH::Wire.write_string(outer, "")             # kdfoptions
+        SSH::Wire.write_uint32(outer, 1_u32)
+        pem = "-----BEGIN OPENSSH PRIVATE KEY-----\n" +
+              Base64.strict_encode(outer.to_slice) + "\n" +
+              "-----END OPENSSH PRIVATE KEY-----\n"
+        SSH::PrivateKey.parse(pem)
+      end
+    end
+
+    it "raises when ciphername is none but kdfname is not (inconsistent key)" do
+      expect_raises(Exception, /encrypted/) do
+        outer = IO::Memory.new
+        outer.print("openssh-key-v1\0")
+        SSH::Wire.write_string(outer, "none")    # ciphername
+        SSH::Wire.write_string(outer, "bcrypt")  # kdfname — must also be "none"
+        SSH::Wire.write_string(outer, "")        # kdfoptions
         SSH::Wire.write_uint32(outer, 1_u32)
         pem = "-----BEGIN OPENSSH PRIVATE KEY-----\n" +
               Base64.strict_encode(outer.to_slice) + "\n" +

@@ -93,13 +93,14 @@ module SSH
       ciphername = Wire.read_string_str(io)
       raise "encrypted OpenSSH keys are not supported (cipher: #{ciphername})" unless ciphername == "none"
 
-      Wire.read_string(io) # kdfname
+      kdfname = Wire.read_string_str(io)
+      raise "encrypted OpenSSH keys are not supported (kdf: #{kdfname})" unless kdfname == "none"
       Wire.read_string(io) # kdfoptions
 
       num_keys = Wire.read_uint32(io)
       raise "only single-key OpenSSH files are supported" unless num_keys == 1
 
-      Wire.read_string(io) # public key blob (outer copy — we read it from the private blob)
+      outer_pub_blob = Wire.read_string(io)
 
       priv_blob = IO::Memory.new(Wire.read_string(io))
       check1 = Wire.read_uint32(priv_blob)
@@ -110,10 +111,21 @@ module SSH
       raise "expected ssh-ed25519, got #{key_type}" unless key_type == "ssh-ed25519"
 
       pub_key  = Wire.read_string(priv_blob).dup                # 32-byte public key
+      raise "Ed25519 public key wrong size (#{pub_key.size})" unless pub_key.size == 32
       priv_raw = Wire.read_string(priv_blob).dup                # seed (32) || pubkey (32)
       comment  = Wire.read_string_str(priv_blob)
 
       raise "Ed25519 private key blob wrong size (#{priv_raw.size})" unless priv_raw.size == 64
+      raise "Ed25519 key inconsistency: public key copies do not agree" unless priv_raw[32, 32] == pub_key
+      raise "Ed25519 key inconsistency: outer public key does not match inner" unless outer_pub_blob == public_key_blob(pub_key)
+
+      # Verify padding integrity: bytes must be 1, 2, 3, … (not just zero-fill)
+      pad_byte = 1_u8
+      while priv_blob.pos < priv_blob.size
+        b = priv_blob.read_byte || raise "truncated OpenSSH private key padding"
+        raise "OpenSSH private key padding invalid" unless b == pad_byte
+        pad_byte += 1
+      end
 
       Ed25519KeyPair.new(
         private_seed: priv_raw[0, 32],

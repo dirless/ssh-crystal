@@ -70,5 +70,17 @@ describe SSH::Certificate do
       cert2 = SSH::Certificate.sign(SPEC_CA_PEM, SPEC_USER_PUB, "alice@acme", ["alice"], 3600_i64)
       cert1.should_not eq(cert2)
     end
+
+    it "raises on empty principals to prevent wildcard certificates" do
+      expect_raises(ArgumentError, /empty/) do
+        SSH::Certificate.sign(SPEC_CA_PEM, SPEC_USER_PUB, "alice@acme", [] of String, 3600_i64)
+      end
+    end
+
+    it "raises on non-positive ttl_seconds" do
+      expect_raises(ArgumentError, /positive/) do
+        SSH::Certificate.sign(SPEC_CA_PEM, SPEC_USER_PUB, "alice@acme", ["alice"], 0_i64)
+      end
+    end
   end
 end
