@@ -1,0 +1,15 @@
+name: ssh-crystal
+version: 0.1.0
+
+description: Pure-Crystal SSH primitives — Ed25519 keypair generation, OpenSSH key serialization, and SSH certificate signing
+
+authors:
+  - Dirless <info@dirless.com>
+
+license: Apache-2.0
+
+crystal: ">= 1.20.0"
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
